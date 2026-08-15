@@ -4,12 +4,16 @@
 # command line — no shell history, no ps exposure), runs `import`, and verifies
 # the resulting addresses against config/agents.json.
 #
-# Usage: ./wallet-recover.sh <agent>    e.g. ./wallet-recover.sh hermes-main
+# Usage: ./wallet-recover.sh <agent> [verify-agent]
+#   <agent>        name of the FRESH data dir to import into (throwaway for drills)
+#   [verify-agent] optional: verify against THIS agent's entry in agents.json
+#                  (e.g. drill: ./wallet-recover.sh recovery-test hermes-main)
 #
 # NOTE: run the recovery DRILL before real funds move (test-plan item 5).
 
 set -e
-AGENT="${1:?usage: wallet-recover.sh <agent>}"
+AGENT="${1:?usage: wallet-recover.sh <agent> [verify-agent]}"
+VERIFY_AGENT="${2:-$AGENT}"
 
 DATA_ROOT="$HOME/.local/share/pivx-agent-kit"
 AGENT_DIR="$DATA_ROOT/$AGENT"
@@ -44,10 +48,10 @@ SEED=""
 unset SEED
 
 echo
-echo "Verifying addresses against config/agents.json ..."
+echo "Verifying addresses against config/agents.json (entry: $VERIFY_AGENT) ..."
 ADDRS=$(PIVX_AGENT="$AGENT" pivx-agent-kit address)
 echo "$ADDRS"
-python3 - config/agents.json "$AGENT" <<'PYEOF'
+python3 - config/agents.json "$VERIFY_AGENT" <<'PYEOF'
 import json, sys
 agents = json.load(open(sys.argv[1]))["agents"]
 agent = next((a for a in agents if a["name"] == sys.argv[2]), None)
