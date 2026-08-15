@@ -1,0 +1,28 @@
+diff --git a/src/wallet/unlock.rs b/src/wallet/unlock.rs
+index 942b17c..a9c568e 100644
+--- a/src/wallet/unlock.rs
++++ b/src/wallet/unlock.rs
+@@ -81,11 +81,19 @@ fn read_passphrase() -> Result<String> {
+ /// check for "anything on the other end of stdin?" without consuming it.
+ /// On Unix the stdin fd's mode bits tell us. We don't peek because that
+ /// risks blocking forever on an empty pipe.
++///
++/// Local patch (2026-08-15): the original `!stdin.is_terminal()` returned
++/// true for a CLOSED stdin (docker without `-i` maps fd 0 to /dev/null or
++/// nothing), so `read_to_string` got "" → "no unlock passphrase" — the
++/// env-var fallback was unreachable dead code. We now stat fd 0 and only
++/// treat fifo/regular-file stdin as pipe data; /dev/null (char device) and
++/// closed stdin fall through to MERCHANT_KIT_UNLOCK_PASSPHRASE.
+ fn has_piped_stdin() -> bool {
+-    // If `is_terminal` returned false (caller already checked), the fd is
+-    // either a pipe, file, or socket. All three are valid passphrase
+-    // sources — we just need to read it. So if we got here, yes.
+-    !std::io::stdin().is_terminal()
++    use std::os::unix::fs::FileTypeExt;
++    match std::fs::metadata("/dev/fd/0") {
++        Ok(m) => m.file_type().is_fifo() || m.file_type().is_file(),
++        Err(_) => false,
++    }
+ }
+ 
+ fn sha256_32(data: &[u8]) -> [u8; 32] {
