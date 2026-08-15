@@ -1,0 +1,20 @@
+# Build stage: rust (glibc >= 2.39) — cargo build --release
+FROM rust:latest AS builder
+WORKDIR /build
+# Vendor-less build; crates.io fetch at build time (Kon runs this per conventions).
+COPY pivx-merchant-kit/ /build/
+RUN cargo build --release
+
+# Runtime stage: Ubuntu 24.04 (matches host-independent glibc requirement)
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=builder /build/target/release/pivx-merchant-kit /app/pivx-merchant-kit
+# Config, SQLite DB, and Sapling params all live under /app/data (bind-mount for persistence)
+VOLUME ["/app/data"]
+COPY config/merchant-config.toml /app/config.toml
+EXPOSE 7474
+HEALTHCHECK --interval=30s --timeout=5s CMD curl -fs http://127.0.0.1:7474/healthz || exit 1
+ENTRYPOINT ["/app/pivx-merchant-kit"]
+CMD ["run", "--config", "/app/config.toml"]

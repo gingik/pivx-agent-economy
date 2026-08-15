@@ -1,0 +1,54 @@
+{
+  "name": "PIVX Task Poller (via Execute Command)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [ { "field": "minutes", "minutesInterval": 30 } ] }
+      },
+      "id": "sched-1",
+      "name": "Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [ 0, 0 ]
+    },
+    {
+      "parameters": {
+        "command": "pivx-agent-kit task list --status open --limit 20",
+        "executeIn": "currentProcess"
+      },
+      "id": "cmd-1",
+      "name": "List open tasks",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [ 220, 0 ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.stdout;\nconst tasks = JSON.parse(raw);\nconst eligible = tasks.filter(t => /dev|social|research|content/.test(String(t.category || '')));\nreturn eligible.map(t => ({ json: { id: t.id, title: t.title, amount: t.amount, category: t.category } }));"
+      },
+      "id": "code-1",
+      "name": "Filter eligible",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 440, 0 ]
+    },
+    {
+      "parameters": {
+        "chatId": "328267004",
+        "text": "={{ 'PIVX open bounties eligible: ' + $json.length + '\\n' + $items.map(i => i.json.id + ' — ' + i.json.title + ' (' + i.json.amount + ' PIV)').join('\\n') }}",
+        "additionalFields": {}
+      },
+      "id": "tg-1",
+      "name": "Telegram alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [ 660, 0 ]
+    }
+  ],
+  "connections": {
+    "Every 30 min": { "main": [ [ { "node": "List open tasks", "type": "main", "index": 0 } ] ] },
+    "List open tasks": { "main": [ [ { "node": "Filter eligible", "type": "main", "index": 0 } ] ] },
+    "Filter eligible": { "main": [ [ { "node": "Telegram alert", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

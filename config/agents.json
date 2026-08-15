@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "agents": [
+    {
+      "name": "hermes-main",
+      "role": "operator/merchant agent (default)",
+      "data_dir": "/home/kon/.local/share/pivx-agent-kit/hermes-main",
+      "shield_address": "ps1hpamhcrgumpt2lq6hh60y4522d986n44ktgd5jxqzge5ll8kdxfm53ne8he0c7cpajvk7gfstjq",
+      "transparent_address": "DEd1j7RYyu8RVxLbBV4swKS3abwYQsyVoi",
+      "birthday_height": 5236346,
+      "funded": false,
+      "notes": "PAPER-SEED BACKUP PENDING — do not fund until Kon confirms export backup"
+    }
+  ]
+}

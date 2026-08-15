@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "pivx-hermes-main": {
+      "command": "/home/kon/.local/bin/pivx-agent-kit",
+      "args": ["serve"],
+      "env": { "PIVX_AGENT": "hermes-main" }
+    }
+  }
+}

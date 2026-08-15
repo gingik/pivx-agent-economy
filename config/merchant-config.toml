@@ -1,0 +1,50 @@
+# pivx-merchant-kit daemon config — derived from upstream config.toml.example (v0.1.0).
+# Operator: Kon. Do NOT commit real secrets; generate fresh per deployment.
+# Command: docker run --rm -v /path/to/this/config.toml:/app/config.toml -p 127.0.0.1:7474:7474 pivx-merchant-kit
+
+[network]
+# Only "mainnet" is supported today.
+name = "mainnet"
+
+[wallet]
+# Directory the daemon owns. Encrypted wallet, SQLite DB, and HD cursor all live here.
+data_dir = "./data"
+
+[sync]
+# PIVX Core RPC exposing the compact-stream API (used by wallet-kit for shield sync).
+# Public node per upstream docs — verify reachability before first deploy.
+rpc_url = "https://rpc.pivxla.bz/mainnet"
+# Blockbook explorer for transparent UTXO discovery.
+explorer_url = "https://explorer.pivxla.bz"
+# How often the daemon polls the chain.
+poll_interval_secs = 30
+
+[payments]
+# DECISION: transparent default (≈0.00002 PIV fee). Shield (≈0.024 PIV) optional later.
+# "shield" or "both" triggers ~50MB Sapling params download on first start.
+accept = "transparent"
+# Confirmations required before the webhook fires.
+confirmations = 3
+# Default expiry for newly-created invoices (1800 = 30 min).
+default_expiry_secs = 1800
+# Reset (not extend) expiry on partial payment.
+partial_reset_secs = 1800
+
+[refunds]
+# Disabled for M2 — overpayments become donations; partial-expired keep funds.
+enabled = false
+
+[api]
+# Local-only. Front with TLS-terminating reverse proxy if backend is remote.
+bind = "127.0.0.1:7474"
+# Bearer token — REPLACE per deployment. Daemon refuses to start if literal "REPLACE_ME".
+auth_token = "REPLACE_ME"
+
+[webhooks]
+# Where the daemon POSTs events. Retries with exponential backoff (2s..1h cap).
+url = "http://127.0.0.1:8081/webhook"
+# HMAC-SHA256 secret — set same value in merchant-webhook-receiver.py env.
+# [REDACTED] — generate fresh per deployment (e.g. openssl rand -hex 32).
+secret = ""
+# Max delivery attempts before dead-letter.
+max_attempts = 10
