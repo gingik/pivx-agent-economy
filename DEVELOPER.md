@@ -228,6 +228,17 @@ config + SQLite + Sapling params on one volume. **Fallback:** if the build fails
   (v0.2.4 exists upstream — untested).
 - `[api] bind 127.0.0.1:7474` (see deploy note below), `auth_token = [REDACTED]` (generate per deployment)
 - `[webhooks] url` → local receiver, `secret = [REDACTED]` (HMAC), `max_attempts = 10`
+- **Mempool height backfill (patch `0003`, required):** Blockbook reports
+  `height = 0` for a UTXO still in the mempool. A payment first *matched* in the
+  mempool is inserted with `block_height = 0`, and two upstream bugs then keep it
+  there forever: (1) the transparent watcher's `watch_list` dropped
+  `Confirming` invoices, so the address was never re-polled; (2) the matcher's
+  duplicate-UTXO path (`UNIQUE(txid, vout)`) was a silent no-op instead of
+  backfilling the now-known height. Consequence: the confirmation sweep computes
+  `depth = chain_tip - block_height` = 0 forever and the invoice is stuck in
+  `Confirming` even at 25+ real confirmations (observed live with `hermes-test-002`).
+  The patch keeps `Confirming` in the watchlist and backfills the mined height
+  (guarded to `block_height = 0` rows only — reorgs stay the sweep's job).
 
 ### Deploy (live, verified 2026-08-15)
 - **Apply the local patch first** (upstream bug, see

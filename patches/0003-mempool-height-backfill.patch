@@ -1,0 +1,125 @@
+diff --git a/src/api/invoices.rs b/src/api/invoices.rs
+index fac9ef4..40292a2 100644
+--- a/src/api/invoices.rs
++++ b/src/api/invoices.rs
+@@ -188,6 +188,7 @@ mod tests {
+                 rpc_url: "https://example.com".into(),
+                 explorer_url: "https://example.com".into(),
+                 poll_interval_secs: 30,
++                shield_enabled: false,
+             },
+             payments: PaymentsConfig {
+                 accept,
+diff --git a/src/matcher/sweeper.rs b/src/matcher/sweeper.rs
+index 2f05e88..854c81c 100644
+--- a/src/matcher/sweeper.rs
++++ b/src/matcher/sweeper.rs
+@@ -68,6 +68,7 @@ mod tests {
+                 rpc_url: "https://x".into(),
+                 explorer_url: "https://x".into(),
+                 poll_interval_secs: 30,
++                shield_enabled: false,
+             },
+             payments: PaymentsConfig {
+                 accept: AcceptPolicy::Both,
+diff --git a/src/matcher/transparent.rs b/src/matcher/transparent.rs
+index 631d868..1c98438 100644
+--- a/src/matcher/transparent.rs
++++ b/src/matcher/transparent.rs
+@@ -50,9 +50,17 @@ pub async fn apply(
+             Err(Error::Sqlx(sqlx::Error::Database(e)))
+                 if e.message().to_lowercase().contains("unique") =>
+             {
+-                // Already-known UTXO. Idempotent re-poll, nothing to do.
+-                // Don't even log at debug — this is the common case on
+-                // every tick for any invoice with a pending payment.
++                // Already-known UTXO. Idempotent re-poll — but if the
++                // row was inserted while the tx was still in the mempool
++                // (Blockbook height = 0 at discovery), backfill the real
++                // height now that it's mined. Without this the payment
++                // sits at depth 0 forever and the invoice never leaves
++                // Confirming. No-op when the row already has a height or
++                // the UTXO is still unconfirmed (height = 0).
++                if d.utxo.height > 0 {
++                    payments::backfill_block_height(db, &d.utxo.txid, d.utxo.vout, d.utxo.height)
++                        .await?;
++                }
+             }
+             Err(other) => return Err(other),
+         }
+diff --git a/src/storage/payments.rs b/src/storage/payments.rs
+index 46d05af..2ea4894 100644
+--- a/src/storage/payments.rs
++++ b/src/storage/payments.rs
+@@ -53,6 +53,33 @@ pub async fn update_block_height(
+     Ok(())
+ }
+ 
++/// Backfill the mined height for a payment that was first observed in
++/// the mempool. The matcher re-polls an invoice address every tick and
++/// re-encounters already-known UTXOs; Blockbook reports `height = 0`
++/// until the tx is mined, so the row inserted at discovery time can
++/// carry 0 forever while the confirmation sweep keeps computing a
++/// depth of 0 (0 = mempool) and the invoice never leaves Confirming.
++/// Only touches rows still at height 0 — mined heights are never
++/// overwritten (reorg handling is the confirmation sweep's job).
++pub async fn backfill_block_height(
++    db: &Db,
++    txid: &str,
++    vout: u32,
++    block_height: u32,
++) -> Result<()> {
++    sqlx::query(
++        "UPDATE payments
++            SET block_height = ?
++          WHERE txid = ? AND vout = ? AND block_height = 0",
++    )
++    .bind(block_height as i64)
++    .bind(txid)
++    .bind(vout as i64)
++    .execute(db.pool())
++    .await?;
++    Ok(())
++}
++
+ /// Sum of all observed payment values for an invoice, regardless of
+ /// confirmation depth. Drives the underpay/exact/overpay decision in
+ /// `next_status_on_payment`.
+diff --git a/src/sync/transparent.rs b/src/sync/transparent.rs
+index 32d0b8d..4b3da3f 100644
+--- a/src/sync/transparent.rs
++++ b/src/sync/transparent.rs
+@@ -98,6 +98,12 @@ pub async fn watch_list(db: &Db) -> Result<Vec<Invoice>> {
+     for status in [
+         crate::invoice::InvoiceStatus::Pending,
+         crate::invoice::InvoiceStatus::PartiallyPaid,
++        // Confirming invoices are still awaiting chain depth. Keep
++        // polling them: a payment first seen in the mempool (Blockbook
++        // height = 0 at discovery) only gets its mined height backfilled
++        // on a re-poll — without that the confirmation sweep computes
++        // depth 0 forever and the invoice never reaches Confirmed.
++        crate::invoice::InvoiceStatus::Confirming,
+     ] {
+         let batch = invoices::list(
+             db,
+@@ -136,7 +142,7 @@ mod tests {
+     }
+ 
+     #[tokio::test]
+-    async fn watch_list_includes_pending_and_partial_only() {
++    async fn watch_list_includes_open_invoices_only() {
+         let db = Db::open_memory().await.unwrap();
+         seed(&db, "DPending", InvoiceStatus::Pending).await;
+         seed(&db, "DPartial", InvoiceStatus::PartiallyPaid).await;
+@@ -147,9 +153,10 @@ mod tests {
+ 
+         let watched = watch_list(&db).await.unwrap();
+         let addrs: Vec<&str> = watched.iter().map(|i| i.address.as_str()).collect();
+-        assert_eq!(addrs.len(), 2);
++        assert_eq!(addrs.len(), 3);
+         assert!(addrs.contains(&"DPending"));
+         assert!(addrs.contains(&"DPartial"));
++        assert!(addrs.contains(&"DConfirming"));
+     }
+ 
+     #[tokio::test]
