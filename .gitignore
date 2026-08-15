@@ -5,3 +5,6 @@ __pycache__/
 vendor/
 canary-words.txt
 config/canary-words*
+
+venv/
+scripts/dashboard.log
