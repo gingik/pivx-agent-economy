@@ -219,6 +219,13 @@ config + SQLite + Sapling params on one volume. **Fallback:** if the build fails
 - `[sync] rpc_url = "https://rpc.pivxla.bz/mainnet"` + `explorer_url =
   "https://explorer.pivxla.bz"` — **public endpoints verified by upstream docs**;
   re-verify reachability at deploy time (curl in §7)
+- `[sync] shield_enabled = false` (transparent-only patch, **required**):
+  wallet-kit v0.2.2's compact parser expects lightwalletd framing (LE cmu,
+  724-byte outputs); PivxNodeController RPCs serve BE cmu + 756-byte outputs →
+  every shield tick fails `invalid cmu` after re-downloading ~36MB from the
+  wallet birthday (≈35s/tick, API stalls behind the wallet mutex). Skip it;
+  re-enable only behind a compatible lightwalletd or a wallet-kit pin bump
+  (v0.2.4 exists upstream — untested).
 - `[api] bind 127.0.0.1:7474` (see deploy note below), `auth_token = [REDACTED]` (generate per deployment)
 - `[webhooks] url` → local receiver, `secret = [REDACTED]` (HMAC), `max_attempts = 10`
 

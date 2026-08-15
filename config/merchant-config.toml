@@ -18,6 +18,11 @@ rpc_url = "https://rpc.pivxla.bz/mainnet"
 explorer_url = "https://explorer.pivxla.bz"
 # How often the daemon polls the chain.
 poll_interval_secs = 30
+# Transparent-only deployment: skip Sapling sync. wallet-kit v0.2.2 cannot
+# parse PivxNodeController compact streams (BE cmu / 756-byte outputs vs its
+# lightwalletd LE / 724-byte expectation) — every tick would fail and
+# re-download ~36MB. Re-enable only behind a compatible lightwalletd RPC.
+shield_enabled = false
 
 [payments]
 # DECISION: transparent default (≈0.00002 PIV fee). Shield (≈0.024 PIV) optional later.

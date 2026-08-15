@@ -1,0 +1,58 @@
+diff --git a/src/config.rs b/src/config.rs
+index 4dd3b37..47133cd 100644
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -48,6 +48,15 @@ pub struct SyncConfig {
+     /// How often the sync loop polls the chain for new blocks / UTXO state.
+     #[serde(default = "defaults::poll_interval_secs")]
+     pub poll_interval_secs: u64,
++    /// When `false`, the daemon skips shield (Sapling) sync entirely —
++    /// transparent-only deployments don't need it. The wallet-kit v0.2.2
++    /// compact parser expects lightwalletd framing (LE cmu, 724-byte
++    /// outputs), which public PivxNodeController RPCs don't serve (BE cmu,
++    /// 756-byte outputs), so shield sync fails against them; a matching
++    /// lightwalletd endpoint or a wallet-kit pin bump is required before
++    /// re-enabling.
++    #[serde(default = "defaults::shield_enabled")]
++    pub shield_enabled: bool,
+ }
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+@@ -127,6 +136,9 @@ mod defaults {
+     pub fn poll_interval_secs() -> u64 {
+         30
+     }
++    pub fn shield_enabled() -> bool {
++        true
++    }
+     pub fn expiry_secs() -> u64 {
+         1800 // 30 minutes
+     }
+diff --git a/src/sync/mod.rs b/src/sync/mod.rs
+index bab395b..ebbed17 100644
+--- a/src/sync/mod.rs
++++ b/src/sync/mod.rs
+@@ -134,9 +134,22 @@ pub async fn run_tick(state: &SyncState) -> Result<()> {
+     // sync iteration. The API layer's reads will queue behind it, which is
+     // fine: the API rarely reads wallet state, and when it does it's a
+     // millisecond-scale query.
+-    let shield_result = {
++    //
++    // Transparent-only deployments (accept = "transparent") skip shield
++    // sync entirely: the wallet-kit v0.2.2 compact parser can't consume
++    // PivxNodeController streams (BE cmu / 756-byte outputs vs its LE /
++    // 724-byte expectation), and each attempt re-downloads ~36MB from
++    // the wallet birthday. See SyncConfig::shield_enabled.
++    let shield_result = if state.config.sync.shield_enabled {
+         let mut wallet = state.wallet.lock().await;
+         shield::tick(&mut wallet, &state.rpc).await?
++    } else {
++        crate::sync::shield::ShieldTickResult {
++            new_notes: vec![],
++            nullifiers: vec![],
++            last_block: 0,
++            advanced: false,
++        }
+     };
+     let s_matched = matcher::shield::apply(
+         &state.db,
