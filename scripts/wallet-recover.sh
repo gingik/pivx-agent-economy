@@ -23,11 +23,11 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 #   - wipe the variable immediately after use
 # Run drills in a private terminal with no other sessions watching `ps`.
 RESTORE_HISTORY=0
-if [ -o history ]; then
+if [ -n "$BASH_VERSION" ] && [ -o history ]; then
     set +o history
     RESTORE_HISTORY=1
 fi
-trap 'stty echo 2>/dev/null; if [ "$RESTORE_HISTORY" = "1" ]; then set -o history; fi' EXIT INT TERM
+trap 'stty echo 2>/dev/null; if [ -n "$BASH_VERSION" ] && [ "$RESTORE_HISTORY" = "1" ]; then set -o history; fi' EXIT INT TERM
 
 DATA_ROOT="$HOME/.local/share/pivx-agent-kit"
 AGENT_DIR="$DATA_ROOT/$AGENT"
