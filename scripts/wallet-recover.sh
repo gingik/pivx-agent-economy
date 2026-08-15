@@ -14,6 +14,20 @@
 set -e
 AGENT="${1:?usage: wallet-recover.sh <agent> [verify-agent]}"
 VERIFY_AGENT="${2:-$AGENT}"
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+
+# Bug list #9: kit `import` is argv-only, so the seed IS visible in `ps`
+# during the ~1-2 s import call — unavoidable with this kit. What we control:
+#   - keep it out of shell history (this session; restored on exit)
+#   - read via hidden tty input, never argv from the user
+#   - wipe the variable immediately after use
+# Run drills in a private terminal with no other sessions watching `ps`.
+RESTORE_HISTORY=0
+if [ -o history ]; then
+    set +o history
+    RESTORE_HISTORY=1
+fi
+trap 'stty echo 2>/dev/null; if [ "$RESTORE_HISTORY" = "1" ]; then set -o history; fi' EXIT INT TERM
 
 DATA_ROOT="$HOME/.local/share/pivx-agent-kit"
 AGENT_DIR="$DATA_ROOT/$AGENT"
@@ -51,15 +65,6 @@ echo
 echo "Verifying addresses against config/agents.json (entry: $VERIFY_AGENT) ..."
 ADDRS=$(PIVX_AGENT="$AGENT" pivx-agent-kit address)
 echo "$ADDRS"
-python3 - config/agents.json "$VERIFY_AGENT" <<'PYEOF'
-import json, sys
-agents = json.load(open(sys.argv[1]))["agents"]
-agent = next((a for a in agents if a["name"] == sys.argv[2]), None)
-if not agent:
-    print("WARN: agent not in agents.json — update it manually.")
-    sys.exit(0)
-print("Expected shield     :", agent["shield_address"])
-print("Expected transparent:", agent["transparent_address"])
-PYEOF
-echo "Check the addresses above match. Then verify balance:"
+printf '%s' "$ADDRS" | python3 "$SCRIPT_DIR/verify-addresses.py" "$VERIFY_AGENT"
+echo "Then verify balance:"
 echo "    PIVX_AGENT=$AGENT pivx-agent-kit balance"

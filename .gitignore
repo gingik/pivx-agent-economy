@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 .env
 *.bak
+vendor/
+canary-words.txt
+config/canary-words*

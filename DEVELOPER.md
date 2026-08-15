@@ -16,7 +16,7 @@ each build step to those criteria. Every shell command is shown in full; secrets
 | Disk | 97% full (2.2 GB free on /) — **no Rust toolchain, no source builds** |
 | Docker | Available; image builds OK |
 | pivx-agent-kit | **v0.6.0**, runs via Docker wrapper (pre-built binary needs glibc 2.39) |
-| pivx-merchant-kit | **v0.1.0**, upstream cloned at `/tmp/pivx-merchant-kit` (source only, no image) |
+| pivx-merchant-kit | **v0.1.0**, vendored at `vendor/pivx-merchant-kit` (source only, no image) |
 | CLI wrapper | `/home/kon/.local/bin/pivx-agent-kit` (docker run --rm -i) |
 | Wallet data root | `~/.local/share/pivx-agent-kit/<agent>/` (one dir per agent) |
 | Ledger | SQLite, `~/.local/share/pivx-agent-kit/ledger.db` (beside wallet data) |
@@ -39,7 +39,10 @@ each build step to those criteria. Every shell command is shown in full; secrets
 ### Conventions
 - Every shell command in this repo is written in full. No ellipses.
 - Secrets: `[REDACTED]` + key name + length. Never in logs/chat.
-- No heredocs (blocked). File-based scripting only.
+- No heredocs (blocked). File-based scripting only — committed helpers under
+  `scripts/`: `ledger.py`, `pivutil.py`, `wallet-check.py`, `verify-addresses.py`,
+  `task_filter.py`, `canary-scan.py`. Regression tests: `test_receiver.py`,
+  `test_helpers.py`, `test_canary.py` (`python3 scripts/test_*.py`).
 - Kon runs sudo, sensitive downloads, and the merchant-kit build himself.
 - Tor SOCKS5 `:9050` available for privacy-sensitive polling if needed.
 
@@ -195,11 +198,14 @@ the board view; then first live signup with Kon's approval.
 ## 6. Merchant prototype (M2) — pivx-merchant-kit
 
 ### Build (Kon runs this — source build, disk heavy)
+Build context is the repo root; upstream is vendored into `vendor/` (gitignored):
 ```sh
 cd ~/github/pivx-agent-economy
-git clone --depth 1 https://github.com/PIVX-Labs/pivx-merchant-kit.git   # if absent
+git clone --depth 1 https://github.com/PIVX-Labs/pivx-merchant-kit.git vendor/pivx-merchant-kit   # one-time
 docker build -f config/Dockerfile.merchant -t pivx-merchant-kit .
 ```
+**Do not** build from `/tmp/pivx-merchant-kit` — the Dockerfile COPY expects
+`vendor/pivx-merchant-kit/` and the context is the repo root (bug-list #10).
 Build stage: `rust:latest` (glibc ≥ 2.39) `cargo build --release` (binary name
 `pivx-merchant-kit`, entrypoint `run --config`). Runtime: Ubuntu 24.04, binary +
 config + SQLite + Sapling params on one volume. **Fallback:** if the build fails
@@ -283,7 +289,7 @@ JSON-RPC POST to `/mainnet` returns 405 (wrong shape, not a broken endpoint).
 | 1 | balance non-zero after funding; sign-message verifies via public PIVX verifymessage | §2, §4 |
 | 2 | completed task row in ledger with txid resolvable on explorer | §5, §8 |
 | 3 | webhook receiver log shows invoice.confirmed; buyer verifymessage passes; txid on explorer | §6 |
-| 4 | 7-day unattended soak; Telegram success/failure alerts; zero seed-material canary hits in logs | §8, docs/test-plan.md |
+| 4 | 7-day unattended soak; Telegram success/failure alerts; zero seed-material canary hits in logs (`scripts/canary-scan.py` — see setup in its header; canary words file `~/.config/pivx-agent-economy/canary-words.txt`, never committed) | §8, docs/test-plan.md |
 | 5 | recovery drill: fresh data dir + import from paper seed reproduces addresses + balance | §3, docs/test-plan.md |
 | 6 | merchant container /healthz 200; SQLite file present; dust invoice confirms | §6, docs/test-plan.md |
 

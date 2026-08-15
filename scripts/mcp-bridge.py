@@ -9,6 +9,12 @@ node calling `pivx-agent-kit <subcommand>` directly (JSON in/out). See
 config/n8n-task-workflow.json. Use this bridge only if you need persistent tool
 sessions.
 
+⚠️ DEV/DEBUG ONLY — do not wire into production n8n workflows:
+  • every request spawns a fresh kit container (~seconds of startup per call),
+  • concurrent requests race on the same wallet data dir (SQLite/ledger locks),
+  • stdout is piped via communicate() and control chars are unescaped.
+n8n production path = Execute Command pattern (config/n8n-task-workflow.json).
+
 Run:  PIVX_AGENT=hermes-main python3 mcp-bridge.py [port]   (default 127.0.0.1:8787)
 """
 import json

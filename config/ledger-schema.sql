@@ -11,16 +11,26 @@ CREATE TABLE IF NOT EXISTS orders (
     external_id  TEXT UNIQUE,           -- alert-order-id (idempotency key)
     invoice_id   TEXT,
     amount_sat   INTEGER NOT NULL,
-    payer_addr   TEXT,                  -- transparent payer address
-    status       TEXT NOT NULL DEFAULT 'pending',  -- pending|confirmed|expired|cancelled
+    payer_addr   TEXT,                  -- invoice address the payer funded
+    status       TEXT NOT NULL DEFAULT 'pending',  -- pending|partially_paid|confirming|confirmed|expired|cancelled
     txid         TEXT,
     alert_hash   TEXT,                  -- SHA256 of delivered alert payload
     signature    TEXT,                  -- sign-message base64 sig (buyer verifies)
+    signer_addr  TEXT,                  -- address that produced the signature (M2)
     created_at   INTEGER NOT NULL,
     confirmed_at INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_external ON orders(external_id);
+
+-- M2: webhook delivery dedupe — idempotency contract is X-Merchant-Delivery-Id
+-- (a NEW UUID per delivery attempt of the same event; repeats are retries).
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+    delivery_id TEXT PRIMARY KEY,
+    invoice_id  TEXT NOT NULL,
+    event_type  TEXT NOT NULL,
+    received_at INTEGER NOT NULL
+);
 
 -- M1: PIVX Tasks bounty rewards
 CREATE TABLE IF NOT EXISTS task_rewards (

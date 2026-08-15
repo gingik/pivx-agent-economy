@@ -1,13 +1,15 @@
 # Build stage: rust (glibc >= 2.39) — cargo build --release
+# Build context is the REPO ROOT. Upstream must be vendored first (one-time):
+#   git clone --depth 1 https://github.com/PIVX-Labs/pivx-merchant-kit.git vendor/pivx-merchant-kit
+# (vendor/ is gitignored — see DEVELOPER.md §6. Do NOT build from /tmp.)
 FROM rust:latest AS builder
 WORKDIR /build
-# Vendor-less build; crates.io fetch at build time (Kon runs this per conventions).
-COPY pivx-merchant-kit/ /build/
+COPY vendor/pivx-merchant-kit/ /build/
 RUN cargo build --release
 
 # Runtime stage: Ubuntu 24.04 (matches host-independent glibc requirement)
 FROM ubuntu:24.04
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /build/target/release/pivx-merchant-kit /app/pivx-merchant-kit

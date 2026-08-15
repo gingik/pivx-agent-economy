@@ -9,6 +9,7 @@
 
 set -e
 AGENT="${1:-hermes-main}"
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 WALLET="$HOME/.local/share/pivx-agent-kit/$AGENT/wallet.json"
 
 if [ ! -f "$WALLET" ]; then
@@ -26,12 +27,8 @@ else
 fi
 
 # Basic sanity: file is non-empty and valid JSON with required fields.
-python3 - "$WALLET" <<'PYEOF'
-import json, sys
-raw = open(sys.argv[1]).read()
-data = json.loads(raw)
-print(f"OK: wallet.json parses ({len(raw)} bytes)")
-PYEOF
+# (Committed helper — no heredocs, per repo rule.)
+python3 "$SCRIPT_DIR/wallet-check.py" "$WALLET"
 
 echo
 echo "================================================================"

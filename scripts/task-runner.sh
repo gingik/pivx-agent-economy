@@ -4,6 +4,8 @@
 # gate for the first N tasks; then fully unattended), submits work, and journals
 # every transition to the SQLite ledger (task_rewards).
 #
+# Ledger access goes through the committed helper scripts/ledger.py — no heredocs.
+#
 # Usage:
 #   ./task-runner.sh <agent> [--dry-run] [--max-tasks N]
 # Env: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (alerts), GATE_TASKS (default 3)
@@ -20,17 +22,12 @@ MAX_TASKS=1
 GATE_TASKS="${GATE_TASKS:-3}"
 ELIGIBLE_CATEGORIES='dev|social|research|content'
 LEDGER_DB="${LEDGER_DB:-$HOME/.local/share/pivx-agent-kit/ledger.db}"
-SIGNUPS_DONE=$(python3 - "$LEDGER_DB" "$AGENT" <<'PYEOF'
-import sqlite3, sys
-db, agent = sys.argv[1], sys.argv[2]
-conn = sqlite3.connect(db)
-try:
-    row = conn.execute("SELECT COUNT(*) FROM task_rewards WHERE handle=? AND status != 'rejected'", (agent,)).fetchone()
-    print(row[0] or 0)
-except Exception:
-    print(0)
-PYEOF
-)
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+
+# Gate metric: only rows with REAL signup progress count. 'applied' and
+# 'pending-approval' rows are pre-inserted before anything real happens and
+# must NOT open the gate (bug list #6).
+SIGNUPS_DONE=$(python3 "$SCRIPT_DIR/ledger.py" count-signed-up "$LEDGER_DB" "$AGENT")
 
 tg() { # tg <text>
     [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ] && \
@@ -39,14 +36,7 @@ tg() { # tg <text>
 }
 
 journal() { # journal <task_id> <status> <reason>
-    python3 - "$LEDGER_DB" "$AGENT" "$1" "$2" "${3:-}" "$(date +%s)" <<'PYEOF'
-import sqlite3, sys
-db, agent, task, status, reason, ts = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], int(sys.argv[6])
-conn = sqlite3.connect(db)
-conn.execute("CREATE TABLE IF NOT EXISTS task_rewards (id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT, handle TEXT, bounty_sat INTEGER, status TEXT, txid TEXT, reason TEXT, ts INTEGER)")
-conn.execute("INSERT INTO task_rewards (task_id,handle,status,reason,ts) VALUES (?,?,?,?,?)", (task, agent, status, reason, ts))
-conn.commit()
-PYEOF
+    python3 "$SCRIPT_DIR/ledger.py" journal-task "$LEDGER_DB" "$AGENT" "$1" "$2" "${3:-}" "$(date +%s)"
 }
 
 echo "[task-runner] agent=$AGENT dry_run=$DRY_RUN signups_done=$SIGNUPS_DONE"
@@ -57,55 +47,61 @@ echo "$LIST" > /tmp/task_runner_list.json
 
 # 2. Filter eligible (python parse; kit JSON has raw control chars → strict=False).
 #    Uses the committed helper scripts/task_filter.py (same dir as this script).
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 FILTERED=$(python3 "$SCRIPT_DIR/task_filter.py" /tmp/task_runner_list.json "$ELIGIBLE_CATEGORIES" 2>/dev/null)
 
 COUNT=$(printf '%s' "$FILTERED" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
 echo "eligible tasks: $COUNT"
 [ "$COUNT" -eq 0 ] && { echo "no eligible tasks; done"; exit 0; }
 
-# 3. Pick first MAX_TASKS
-printf '%s' "$FILTERED" | python3 -c "import json,sys; [print(t['id'], t.get('title','')[:80], t.get('amount','')) for t in json.load(sys.stdin)[:$MAX_TASKS]]" \
-    | while read -r TID TITLE AMOUNT; do
-        echo "--- task $TID: $TITLE ($AMOUNT PIV) ---"
+# 3. Pick first MAX_TASKS into a temp file, then iterate with a file-redirected
+#    loop — the old `... | while read` ran in a SUBSHELL and journal/counter
+#    state was lost (bug list #7).
+PICKS="/tmp/task_runner_picks_$$.txt"
+SEP="$(printf '\t')"
+printf '%s' "$FILTERED" | python3 -c "import json,sys; [print(t['id'] + '$SEP' + t.get('title','')[:80] + '$SEP' + str(t.get('amount',''))) for t in json.load(sys.stdin)[:$MAX_TASKS]]" > "$PICKS"
 
-        # Human-in-the-loop gate for the first N signups
-        if [ "$SIGNUPS_DONE" -lt "$GATE_TASKS" ] && [ "$DRY_RUN" -eq 0 ]; then
-            tg "[PIVX task-runner] $AGENT wants to sign up for task $TID: $TITLE ($AMOUNT PIV). Gate active (${SIGNUPS_DONE}/${GATE_TASKS}). Reply APPROVE to allow."
-            journal "$TID" "pending-approval" "gate"
-            echo "gate: awaiting Kon approval (signup NOT sent)"
-            continue
-        fi
+while IFS="$SEP" read -r TID TITLE AMOUNT; do
+    [ -z "$TID" ] && continue
+    echo "--- task $TID: $TITLE ($AMOUNT PIV) ---"
 
-        journal "$TID" "applied" ""
+    # Human-in-the-loop gate for the first N signups
+    if [ "$SIGNUPS_DONE" -lt "$GATE_TASKS" ] && [ "$DRY_RUN" -eq 0 ]; then
+        tg "[PIVX task-runner] $AGENT wants to sign up for task $TID: $TITLE ($AMOUNT PIV). Gate active (${SIGNUPS_DONE}/${GATE_TASKS}). Reply APPROVE to allow."
+        journal "$TID" "pending-approval" "gate"
+        echo "gate: awaiting Kon approval (signup NOT sent)"
+        continue
+    fi
 
-        if [ "$DRY_RUN" -eq 1 ]; then
-            echo "dry-run: would signup + work + submit $TID"
-            continue
-        fi
+    journal "$TID" "applied" ""
 
-        # 4. Signup
-        if PIVX_AGENT="$AGENT" pivx-agent-kit task signup "$TID" 2>&1; then
-            journal "$TID" "signed-up" ""
-            tg "[PIVX task-runner] $AGENT signed up: $TID — $TITLE"
-        else
-            journal "$TID" "signup-failed" "CLI error"
-            tg "[PIVX task-runner] SIGNUP FAILED $TID: $TITLE"
-            continue
-        fi
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "dry-run: would signup + work + submit $TID"
+        continue
+    fi
 
-        # 5. WORK: placeholder — real agents run their own work function.
-        # TODO(M1): agent-specific work generation for the task description.
-        echo "performing work for $TID ..."
+    # 4. Signup
+    if PIVX_AGENT="$AGENT" pivx-agent-kit task signup "$TID" 2>&1; then
+        journal "$TID" "signed-up" ""
+        tg "[PIVX task-runner] $AGENT signed up: $TID — $TITLE"
+    else
+        journal "$TID" "signup-failed" "CLI error"
+        tg "[PIVX task-runner] SIGNUP FAILED $TID: $TITLE"
+        continue
+    fi
 
-        # 6. Submit (approval requires rep ≥ min_worker_rep; new wallets start at 0)
-        if PIVX_AGENT="$AGENT" pivx-agent-kit task submit "$TID" "Work submitted by $AGENT (see attachments)" 2>&1; then
-            journal "$TID" "submitted" ""
-            tg "[PIVX task-runner] submitted $TID"
-        else
-            journal "$TID" "submit-failed" "CLI error"
-            tg "[PIVX task-runner] SUBMIT FAILED $TID"
-        fi
-    done
+    # 5. WORK: placeholder — real agents run their own work function.
+    # TODO(M1): agent-specific work generation for the task description.
+    echo "performing work for $TID ..."
+
+    # 6. Submit (approval requires rep ≥ min_worker_rep; new wallets start at 0)
+    if PIVX_AGENT="$AGENT" pivx-agent-kit task submit "$TID" "Work submitted by $AGENT (see attachments)" 2>&1; then
+        journal "$TID" "submitted" ""
+        tg "[PIVX task-runner] submitted $TID"
+    else
+        journal "$TID" "submit-failed" "CLI error"
+        tg "[PIVX task-runner] SUBMIT FAILED $TID"
+    fi
+done < "$PICKS"
+rm -f "$PICKS"
 
 echo "[task-runner] done"

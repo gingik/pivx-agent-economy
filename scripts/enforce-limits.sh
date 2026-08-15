@@ -6,6 +6,9 @@
 #   FLOOR_SAT     — minimum balance kept (soft floor; denied below)
 # Denied sends are journaled to the SQLite ledger + Telegram alert.
 #
+# Amounts are converted with Decimal (scripts/pivutil.py) — float math lost
+# satoshis on large amounts (bug list #8). Ledger access via scripts/ledger.py.
+#
 # Usage: enforce-limits.sh <to_address> <amount_piv> [--from public|private] [memo]
 #   Overrides via env: PER_TX_SAT DAILY_SAT FLOOR_SAT (defaults below).
 
@@ -19,52 +22,27 @@ DAILY_SAT="${DAILY_SAT:-100000000}"     # 1 PIV/day default
 FLOOR_SAT="${FLOOR_SAT:-10000000}"      # keep 0.1 PIV floor
 AGENT="${PIVX_AGENT:-hermes-main}"
 LEDGER_DB="${LEDGER_DB:-$HOME/.local/share/pivx-agent-kit/ledger.db}"
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
-# amount in PIV -> sat
-AMOUNT_SAT=$(python3 -c "print(int(float('$AMOUNT_PIV') * 1e8))")
+# amount in PIV -> sat (exact Decimal conversion)
+AMOUNT_SAT=$(python3 "$SCRIPT_DIR/pivutil.py" piv-to-sat "$AMOUNT_PIV")
 NOW=$(date +%s)
 
-# Balance (transparent + shield). Sync progress goes to stderr; JSON to stdout.
+# Balance (transparent + shield) — exact Decimal sum of public+private.
+# Sync progress goes to stderr; JSON to stdout.
 BAL_JSON=$(PIVX_AGENT="$AGENT" pivx-agent-kit balance 2>/dev/null)
-BAL_SAT=$(python3 - "$BAL_JSON" <<'PYEOF'
-import json, sys
-b = json.loads(sys.argv[1])
-pub = b.get("public_balance") or 0
-priv = b.get("private_balance") or 0
-print(int(float(pub) * 1e8 + float(priv) * 1e8))
-PYEOF
-)
+BAL_SAT=$(printf '%s' "$BAL_JSON" | python3 "$SCRIPT_DIR/pivutil.py" balance-to-sat)
 
-# Today's spend
-TODAY_SPENT=$(python3 - "$LEDGER_DB" "$NOW" <<'PYEOF'
-import sqlite3, sys
-db, now = sys.argv[1], int(sys.argv[2])
-conn = sqlite3.connect(db)
-try:
-    row = conn.execute(
-        "SELECT COALESCE(SUM(amount_sat),0) FROM spend_events WHERE direction='out' AND allowed=1 AND ts >= ?",
-        (now - 86400,)).fetchone()
-    print(row[0])
-except Exception:
-    print(0)
-PYEOF
-)
+# Today's spend (UTC, last 24 h)
+TODAY_SPENT=$(python3 "$SCRIPT_DIR/ledger.py" spent-today "$LEDGER_DB" "$NOW")
 
 DENY=""
 [ "$AMOUNT_SAT" -le "$PER_TX_SAT" ] || DENY="per-tx cap exceeded (max ${PER_TX_SAT} sat)"
 [ "$((TODAY_SPENT + AMOUNT_SAT))" -le "$DAILY_SAT" ] || DENY="daily cap exceeded (${TODAY_SPENT}+${AMOUNT_SAT} > ${DAILY_SAT} sat)"
 [ "$((BAL_SAT - AMOUNT_SAT))" -ge "$FLOOR_SAT" ] || DENY="balance floor would breach (${BAL_SAT} - ${AMOUNT_SAT} < ${FLOOR_SAT} sat)"
 
-# Journal
-python3 - "$LEDGER_DB" "$AGENT" "$NOW" "$AMOUNT_SAT" "${DENY:-allowed}" <<'PYEOF'
-import sqlite3, sys
-db, agent, now, sat, outcome = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), sys.argv[5]
-conn = sqlite3.connect(db)
-conn.execute("CREATE TABLE IF NOT EXISTS spend_events (id INTEGER PRIMARY KEY AUTOINCREMENT, agent TEXT, ts INTEGER, direction TEXT, amount_sat INTEGER, txid TEXT, allowed INTEGER, reason TEXT)")
-conn.execute("INSERT INTO spend_events (agent,ts,direction,amount_sat,allowed,reason) VALUES (?,?,?,?,?,?)",
-             (agent, now, "out", sat, 0 if outcome != "allowed" else 1, outcome))
-conn.commit()
-PYEOF
+# Journal every attempt (allowed or denied)
+python3 "$SCRIPT_DIR/ledger.py" journal-spend "$LEDGER_DB" "$AGENT" "$NOW" "$AMOUNT_SAT" "${DENY:-allowed}"
 
 if [ -n "$DENY" ]; then
     echo "DENIED: $DENY"
