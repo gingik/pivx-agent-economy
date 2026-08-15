@@ -219,8 +219,37 @@ config + SQLite + Sapling params on one volume. **Fallback:** if the build fails
 - `[sync] rpc_url = "https://rpc.pivxla.bz/mainnet"` + `explorer_url =
   "https://explorer.pivxla.bz"` — **public endpoints verified by upstream docs**;
   re-verify reachability at deploy time (curl in §7)
-- `[api] bind 127.0.0.1:7474`, `auth_token = [REDACTED]` (generate per deployment)
+- `[api] bind 127.0.0.1:7474` (see deploy note below), `auth_token = [REDACTED]` (generate per deployment)
 - `[webhooks] url` → local receiver, `secret = [REDACTED]` (HMAC), `max_attempts = 10`
+
+### Deploy (live, verified 2026-08-15)
+- **Apply the local patch first** (upstream bug, see
+  `patches/0001-fix-stdin-passphrase-env-fallback.patch`):
+  `git -C vendor/pivx-merchant-kit apply ../patches/0001-fix-stdin-passphrase-env-fallback.patch`
+  Without it `MERCHANT_KIT_UNLOCK_PASSPHRASE` is dead code: `has_piped_stdin()`
+  returns true for closed stdin (docker without `-i`), so `run` fails with
+  `no unlock passphrase provided`. With `-i` **and** `-d` the stdin pipe never
+  EOFs → daemon hangs at startup (unhealthy, empty logs). After the patch,
+  `--env-file` works — **no `-i` needed**.
+- `[api] bind` must be `0.0.0.0:7474` **inside the container**: the app binds the
+  container loopback and docker-proxy dials the container's eth0 IP, so a
+  `127.0.0.1` bind is unreachable from the host (curl HTTP 000). The
+  `-p 127.0.0.1:7474:7474` mapping keeps it host-loopback-only externally.
+- **No chain download** — transparent = Blockbook `utxos_for_address` polling per
+  open invoice; shield = compact stream via RPC from the wallet birthday
+  (`last_block`, wallet created at ~2.7M, no full scan). API binds before the sync
+  loop; `/healthz` answers `ok` immediately.
+- Live daemon (secrets live in `~/.config/pivx-merchant/`, **0600**):
+```sh
+cd ~/github/pivx-agent-economy
+docker build -f config/Dockerfile.merchant -t pivx-merchant:dev .
+docker run -d --name pivx-merchant --restart unless-stopped \
+  --env-file ~/.config/pivx-merchant/unlock.env \
+  -v pivx-merchant-data:/app/data \
+  -v ~/.config/pivx-merchant/merchant-config.toml:/app/config.toml:ro \
+  --add-host host.docker.internal:host-gateway \
+  -p 127.0.0.1:7474:7474 pivx-merchant:dev
+```
 
 ### Flow (scripts + n8n workflow)
 1. Buyer requests alert → backend `POST /v1/invoices` with `external_id = alert-order-id`
