@@ -353,8 +353,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 def main():
     port = int(os.environ.get("PORT", "7475"))
-    srv = http.server.HTTPServer(("127.0.0.1", port), Handler)
-    print(f"[merchant-webhook-receiver] listening 127.0.0.1:{port} (agent {KIT_AGENT})")
+    bind = os.environ.get("BIND_ADDR", "127.0.0.1")
+    srv = http.server.HTTPServer((bind, port), Handler)
+    print(f"[merchant-webhook-receiver] listening {bind}:{port} (agent {KIT_AGENT})")
     srv.serve_forever()
 
 

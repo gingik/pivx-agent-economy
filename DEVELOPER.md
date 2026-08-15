@@ -250,6 +250,18 @@ docker run -d --name pivx-merchant --restart unless-stopped \
   --add-host host.docker.internal:host-gateway \
   -p 127.0.0.1:7474:7474 pivx-merchant:dev
 ```
+- Webhook receiver (sell side, host process; stdlib, no deps):
+```sh
+chmod +x scripts/start-webhook-receiver.sh
+# one-time: ufw drops docker0→host INPUT by default; without this the
+# container's host.docker.internal:8081 connect times out (HTTP 000).
+sudo ufw allow in on docker0 to any port 8081 proto tcp
+PORT=8081 BIND_ADDR=0.0.0.0 scripts/start-webhook-receiver.sh
+```
+  `BIND_ADDR=0.0.0.0` and `[webhooks] url = "http://host.docker.internal:8081/webhook"`
+  are required together: the container reaches the host via the docker0 bridge
+  (host-gateway), not host loopback. The `/webhook` route is HMAC-verified
+  (`X-Merchant-Signature`); other paths 501/401.
 
 ### Flow (scripts + n8n workflow)
 1. Buyer requests alert → backend `POST /v1/invoices` with `external_id = alert-order-id`
