@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "comment": "Capability matrix (improvements list item 8). The runner consults this BEFORE signup: a task whose routed template is disabled is skipped (journaled as skipped-capability) to protect reputation. Each template lists keyword patterns (case-insensitive, regex) matched against title+description. 'enabled: false' means the template exists but the agent cannot honestly execute it unattended right now (e.g. social follow/join needs real accounts).",
+  "templates": {
+    "download": {
+      "enabled": true,
+      "keywords": ["download", "install", "edge", "wallet", "app", "binary", "apk", "descar"],
+      "verification_ok": ["hash", "checksum", "sha256", "attest", "download", "install"],
+      "note": "Downloads the artifact referenced in the description, computes sha256, writes signed attestation + proof.json."
+    },
+    "social": {
+      "enabled": false,
+      "keywords": ["follow", "join", "discord", "social", "telegram", "instagram", "twitter", "x ", "reddit", "greet", "welcome"],
+      "verification_ok": ["screenshot"],
+      "note": "Would record a signed 'followed X on DATE' statement + optional screenshot. DISABLED: no social accounts controlled by the agent (Discord access confirmed unavailable)."
+    },
+    "research": {
+      "enabled": true,
+      "keywords": ["research", "summary", "summar", "analy", "report", "investigat", "explain", "how does", "what is"],
+      "verification_ok": ["report", "summary", "source", "word"],
+      "note": "Fetches sources from the description (curl), produces a sourced report + signed hash."
+    },
+    "content": {
+      "enabled": true,
+      "keywords": ["write", "content", "translate", "article", "post", "description", "copy", "translat"],
+      "verification_ok": ["text", "content", "file", "document"],
+      "note": "Writes provided/generated content to a deliverable file + signed hash."
+    },
+    "monitoring": {
+      "enabled": true,
+      "keywords": ["monitor", "alert", "watch", "check", "uptime", "price", "status"],
+      "verification_ok": ["alert", "hash", "screenshot"],
+      "note": "M2 path: reuse existing alert_hash + sign flow."
+    }
+  },
+  "skip_globally": {
+    "comment": "Any task whose title/description/verification contains one of these is skipped outright (regardless of template), because the verification method is outside anything we can produce (heavy design/creative/branding).",
+    "patterns": ["logo", "banner", "design", "creative", "branding", "mockup", "figma", "photoshop", "video edit", "voiceover"]
+  }
+}

@@ -37,7 +37,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = String($input.first().json.stdout).replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]/g, ' ');\nconst tasks = JSON.parse(raw);\nconst eligible = tasks.filter(t => /dev|social|research|content/.test(String(t.category || '')));\nreturn eligible.map(t => ({ json: { id: t.id, title: t.title, amount: t.amount, category: t.category } }));"
+        "jsCode": "const raw = String($input.first().json.stdout).replace(/[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F\\u007F]/g, ' ');\nconst tasks = JSON.parse(raw);\nconst eligible = tasks.filter(t => /dev|social|research|content/.test(String(t.category || '')));\nreturn eligible.map(t => ({ json: { id: t.id, title: t.title, amount: t.quoted_amount || t.bounty_sat || t.amount || '', category: t.category } }));"
       },
       "id": "code-1",
       "name": "Filter eligible",
@@ -51,7 +51,7 @@
     {
       "parameters": {
         "chatId": "328267004",
-        "text": "={{ 'PIVX open bounties eligible: ' + $json.length + '\\n' + $items.map(i => i.json.id + ' \u2014 ' + i.json.title + ' (' + i.json.amount + ' PIV)').join('\\n') }}",
+        "text": "={{ 'PIVX open bounties eligible: ' + $json.length + '\\n' + $items.map(i => i.json.id + ' \\u2014 ' + i.json.title + ' (' + i.json.amount + ' PIV)').join('\\n') }}",
         "additionalFields": {}
       },
       "id": "tg-1",
@@ -62,6 +62,50 @@
         660,
         0
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst dir = '/tmp/n8n-task-json';\nfs.mkdirSync(dir, { recursive: true });\nfor (const item of $items) {\n  fs.writeFileSync(dir + '/task-' + item.json.id + '.json', JSON.stringify(item.json));\n}\nreturn $items;"
+      },
+      "id": "code-2",
+      "name": "Dump task JSONs (guard input)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        220
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "command": "python3 /data/github/pivx-agent-economy/scripts/work-dispatcher.py --check /tmp/n8n-task-json/task-{{ $json.id }}.json --matrix /data/github/pivx-agent-economy/config/agent-capabilities.json",
+        "executeIn": "currentProcess"
+      },
+      "id": "cmd-2",
+      "name": "Capability guard (dry-run)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        660,
+        220
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "command": "python3 /data/github/pivx-agent-economy/scripts/task-status-watch.py hermes-main --no-tg",
+        "executeIn": "currentProcess"
+      },
+      "id": "cmd-3",
+      "name": "Status watch (submit loop)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        220,
+        440
+      ],
+      "disabled": true
     }
   ],
   "connections": {
@@ -70,6 +114,13 @@
         [
           {
             "node": "List open tasks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Status watch (submit loop)",
             "type": "main",
             "index": 0
           }
@@ -92,6 +143,24 @@
         [
           {
             "node": "Telegram alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Dump task JSONs (guard input)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dump task JSONs (guard input)": {
+      "main": [
+        [
+          {
+            "node": "Capability guard (dry-run)",
             "type": "main",
             "index": 0
           }

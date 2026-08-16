@@ -1,58 +1,37 @@
--- ledger-schema.sql — SQLite ledger for the agent economy.
--- One file beside wallet data: ~/.local/share/pivx-agent-kit/ledger.db
--- Amounts in satoshis (INTEGER). No PII beyond payer addresses.
--- Memo annotation unavailable on transparent channel (shield-to-shield only) — noted.
+-- ledger-schema.sql — canonical schema for the PIVX agent economy ledger.
+-- Mirrors SCHEMA in scripts/ledger.py. Existing databases are migrated in
+-- place by ledger.py (ALTER TABLE ADD COLUMN); the task_title/category/
+-- verification/proof columns were added 2026-08-16 for task introspection
+-- and proof metadata (improvements list items 1 & 6).
 
-PRAGMA foreign_keys = ON;
-
--- M2: merchant orders (alert-as-a-service)
-CREATE TABLE IF NOT EXISTS orders (
-    id           TEXT PRIMARY KEY,      -- merchant-kit invoice UUID
-    external_id  TEXT UNIQUE,           -- alert-order-id (idempotency key)
-    invoice_id   TEXT,
-    amount_sat   INTEGER NOT NULL,
-    payer_addr   TEXT,                  -- invoice address the payer funded
-    status       TEXT NOT NULL DEFAULT 'pending',  -- pending|partially_paid|confirming|confirmed|expired|cancelled
-    txid         TEXT,
-    alert_hash   TEXT,                  -- SHA256 of delivered alert payload
-    signature    TEXT,                  -- sign-message base64 sig (buyer verifies)
-    signer_addr  TEXT,                  -- address that produced the signature (M2)
-    created_at   INTEGER NOT NULL,
-    confirmed_at INTEGER
-);
-CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-CREATE INDEX IF NOT EXISTS idx_orders_external ON orders(external_id);
-
--- M2: webhook delivery dedupe — idempotency contract is X-Merchant-Delivery-Id
--- (a NEW UUID per delivery attempt of the same event; repeats are retries).
-CREATE TABLE IF NOT EXISTS webhook_deliveries (
-    delivery_id TEXT PRIMARY KEY,
-    invoice_id  TEXT NOT NULL,
-    event_type  TEXT NOT NULL,
-    received_at INTEGER NOT NULL
-);
-
--- M1: PIVX Tasks bounty rewards
 CREATE TABLE IF NOT EXISTS task_rewards (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    task_id     TEXT NOT NULL,
-    handle      TEXT NOT NULL,          -- worker handle (agent name)
-    bounty_sat  INTEGER,
-    status      TEXT NOT NULL DEFAULT 'applied',   -- applied|submitted|approved|rejected|paid|disputed
-    txid        TEXT,
-    reason      TEXT,                   -- rejection/dispute reason
-    ts          INTEGER NOT NULL        -- epoch seconds
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id         TEXT NOT NULL,
+    handle          TEXT NOT NULL,
+    bounty_sat      INTEGER,
+    status          TEXT NOT NULL DEFAULT 'applied',
+    txid            TEXT,
+    reason          TEXT,
+    ts              INTEGER NOT NULL,
+    -- introspection (item 1): task get fields mirrored on the latest row
+    task_title      TEXT,
+    category        TEXT,
+    verification    TEXT,
+    -- proof metadata (item 6): produced by produce-proof.py / work-dispatcher.py
+    deliverable_path TEXT,
+    proof_type      TEXT,
+    proof_hash      TEXT,
+    signature       TEXT,
+    signer_addr     TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_rewards_task ON task_rewards(task_id);
 
--- M3: spend limits enforcement journal
 CREATE TABLE IF NOT EXISTS spend_events (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     agent       TEXT NOT NULL,
     ts          INTEGER NOT NULL,
-    direction   TEXT NOT NULL,          -- out
+    direction   TEXT NOT NULL,
     amount_sat  INTEGER NOT NULL,
     txid        TEXT,
-    allowed     INTEGER NOT NULL,       -- 1 allowed, 0 denied
+    allowed     INTEGER NOT NULL,
     reason      TEXT
 );

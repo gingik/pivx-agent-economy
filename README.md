@@ -80,14 +80,17 @@ invoice); shield = compact sync via public PivxNodeController RPC.
 
 ```
 config/         Dockerfile.merchant, merchant-config.toml, ledger-schema.sql,
-                mcp-hermes.json, n8n-task-workflow.json, agents.json
+                mcp-hermes.json, n8n-task-workflow.json, agents.json,
+                agent-capabilities.json
 patches/        0001-fix-stdin-passphrase-env-fallback.patch
                 0002-shield-sync-gate.patch
                 0003-mempool-height-backfill.patch
 scripts/        merchant-webhook-receiver.py, merchant-dashboard.py,
                 start-webhook-receiver.sh, wallet-recover.sh, wallet-backup.sh,
                 task-runner.sh, enforce-limits.sh, ledger.py, pivutil.py,
-                canary-scan.py, daily-digest.py, mcp-bridge.py, tests
+                canary-scan.py, daily-digest.py, mcp-bridge.py,
+                work-dispatcher.py, produce-proof.py, task-status-watch.py,
+                self-source.py, task_filter.py, tests
 docs/           test-plan.md, security-checklist.md
 ```
 
