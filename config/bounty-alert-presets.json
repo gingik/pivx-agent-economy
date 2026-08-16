@@ -1,0 +1,20 @@
+{
+  "standard": {
+    "categories": ["dev", "research", "content"],
+    "rep_cap": 0,
+    "min_piv": 1.0,
+    "desc": "Tasks the agent could take: non-social, signable now (rep<=0), >=1 PIV"
+  },
+  "all": {
+    "categories": ["*"],
+    "rep_cap": 999,
+    "min_piv": 0.0,
+    "desc": "Every open task on the board"
+  },
+  "big": {
+    "categories": ["*"],
+    "rep_cap": 999,
+    "min_piv": 5.0,
+    "desc": "High-reward tasks only (>=5 PIV)"
+  }
+}

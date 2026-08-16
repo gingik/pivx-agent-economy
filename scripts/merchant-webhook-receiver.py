@@ -41,6 +41,7 @@ Stdlib only. Run:  WEBHOOK_SECRET=... python3 merchant-webhook-receiver.py
 import hashlib
 import hmac
 import http.server
+import importlib
 import json
 import os
 import shlex
@@ -278,6 +279,27 @@ def run_delivery(payload: dict):
         print(f"[delivery] hook failed: {e}")
 
 
+def activate_bounty_alert(invoice: dict):
+    """Bounty-alert service hook: on invoice.confirmed with a
+    bounty-alert-<chat>-<preset>-<ts> external_id, activate the subscriber
+    and welcome the buyer in their own chat."""
+    ext = invoice.get("external_id") or ""
+    if not ext.startswith("bounty-alert-"):
+        return
+    try:
+        ba = importlib.import_module("bounty_alerts")
+        res = ba.activate(ext, payments_txid(invoice))
+        if res:
+            end = time.strftime("%Y-%m-%d", time.localtime(res["period_end"]))
+            ba.tg(
+                res["chat_id"],
+                f"✅ Bounty alerts active (preset '{res['preset']}') until {end}.\n"
+                "New matching tasks will be posted here.",
+            )
+    except Exception as e:
+        print(f"[bounty-alerts] activation failed: {e}")
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         n = int(self.headers.get("content-length", "0"))
@@ -337,6 +359,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 f"💚 PIVX alert order confirmed\ninvoice {inv_id}\n"
                 f"external {payload['external_id']}\nhash {payload['alert_hash'][:16]}…\n{signed}"
             )
+            activate_bounty_alert(invoice)
         elif event_type in ("invoice.expired", "invoice.cancelled"):
             tg(
                 f"⏰ PIVX order {event_type}: {inv_id} "
