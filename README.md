@@ -1,11 +1,13 @@
 # pivx-agent-economy
 
-**Self-hosted PIVX payment stack for AI agents.** A dockerized merchant daemon,
-HMAC webhook receiver, wallet recovery tooling, task-marketplace runner, and
-status dashboard — so an AI agent can hold a wallet, sell a verified output, and
-get paid on-chain in PIV, unattended.
+**The agent that works for money — verifiably, on-chain.** An autonomous agent
+that browses the live PIVX Tasks bounty board, does eligible tasks, signs
+cryptographic proof of its deliverables, and gets paid in PIV to a wallet it
+owns — unattended. The same stack covers the merchant side: sell a verified
+output, collect PIV, provably.
 
-**Status: M0/M1/M2 foundation built and running live** (2026-08). Built by
+**Status: worker loop live on the PIVX Tasks board (first bounty submitted,
+pending review); merchant E2E payment confirmed on-chain** (2026-08). Built by
 [Kon / iotgrowsolutions.com](https://iotgrowsolutions.com).
 
 ---
@@ -15,37 +17,45 @@ get paid on-chain in PIV, unattended.
 AI agents increasingly do real, verifiable work — monitoring, alerting, data
 collection. Paying for that work today requires a human in the loop (invoices,
 cards, bank transfers) or centralized platform accounts agents cannot natively
-hold.
+hold. And most "agent payments" projects stop at *spending* money; almost none
+show an agent *earning* it.
+
+This repo is an earning agent, end to end: it takes real bounties on the live
+PIVX Tasks board, signs verifiable proofs of its work, and collects PIV into
+its own wallet. The same stack includes the merchant side — sell a verified
+output, get paid in PIV, provably — so the agent can be both worker and seller.
 
 PIVX provides the missing primitive: a live proof-of-stake chain with
 zk-SNARK SHIELD privacy, ~60s block times, near-zero fees, and an official
 **agent kit** (CLI + MCP server) purpose-built so agents can hold a wallet and
 transact programmatically.
 
-This repo is a complete, working merchant side: **agent-as-merchant** — sell a
-verified output, get paid in PIV, provably.
-
 ## Features
 
+- **Task-marketplace runner** — the agent browses the live PIVX Tasks board,
+  filters by capability matrix + rep gate, signs up, works, submits a signed
+  proof, and tracks reward verification (human-in-the-loop gates, failure
+  paths)
+- **Proof of work** — every deliverable carries a `sign-message` signature
+  over `SHA256(deliverable + task-id + timestamp)`, verifiable with any PIVX
+  Core `verifymessage`
 - **Merchant daemon** (dockerized `pivx-merchant-kit`, loopback-mapped
   `127.0.0.1:7474`) — invoice creation, transparent payment detection, webhook
   delivery queue with HMAC signing and retries
 - **Webhook receiver** (stdlib Python, no deps) — HMAC-verified
   (`X-Merchant-Signature`), idempotent on `X-Merchant-Delivery-Id`, triggers
   delivery of the paid-for output
-- **Buyer-side proof** — every delivered output carries a `sign-message`
-  signature over `(alert-hash + invoice-id + timestamp)`, verifiable with any
-  PIVX Core `verifymessage`
-- **SQLite ledger** — orders + task rewards with txids, memo-based audit trail
-- **Task-marketplace runner** — signup → work → submit → reward verification on
-  the live PIVX Tasks board, with human-in-the-loop gates and failure paths
+- **SQLite ledger** — task rewards + orders with txids, memo-based audit trail
 - **Wallet recovery tooling** — `wallet-recover.sh` (fresh data dir + seed
   import + address verification), recovery drills in the test plan
 - **Status dashboard** (Flask :5030, basic auth) — daemon health, wallet
-  balance, invoice/payment history, webhook ledger, log tail
+  balance, task/order history, webhook ledger, log tail
 - **Upstream bugfixes as patches** — see [Patches](#patches)
 
 ## Architecture
+
+Two proven loops: **worker** (board → agent works → signed proof → payout) and
+**merchant** (buyer → invoice → payment → webhook → deliverable).
 
 ```
                          ┌────────────────────────────────────────────┐
@@ -169,9 +179,14 @@ python3 scripts/test_helpers.py      # ledger + helper units
 python3 scripts/test_canary.py       # secret-material canary scan
 ```
 
-Plus the live E2E proof: a 1.0 PIV test invoice (`hermes-test-002`) confirmed
-on-chain (txid `bb8bfeaa3ee231ec52a233fafb49b3c9b57f40334474303cd5d4f577da06bc67`),
-`invoice.confirmed` webhook fired, ledger row written.
+Plus live proofs on-chain and on the board:
+
+- Merchant E2E: 1.0 PIV test invoice (`hermes-test-002`) confirmed on-chain
+  (txid `bb8bfeaa3ee231ec52a233fafb49b3c9b57f40334474303cd5d4f577da06bc67`),
+  `invoice.confirmed` webhook fired, ledger row written
+- Worker: bounty #18 on the live PIVX Tasks board ("Descarga Edge Wallet",
+  2 PIV) — signed up, worked, submitted with screenshot + signed proof,
+  pending creator review
 
 ## Security
 
@@ -188,7 +203,7 @@ on-chain (txid `bb8bfeaa3ee231ec52a233fafb49b3c9b57f40334474303cd5d4f577da06bc67
 - **M0 — Foundation (done):** wallet provisioning, MCP `serve` (30 tools),
   task-runner, merchant daemon, ledger, docs
 - **M1 — Marketplace proof:** complete paid task-board bounties end-to-end
-  (in progress — live PIVX Tasks board)
+  (live on the PIVX Tasks board — first submission pending approval)
 - **M2 — Merchant prototype (done):** external payer → PIV → verified output,
   live with test invoice
 - **M3 — Hardening/scale:** multi-agent, spend limits, posting our own
