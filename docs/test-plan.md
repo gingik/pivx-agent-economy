@@ -1,6 +1,6 @@
 # Test Plan — PIVX Agent-to-Agent Payments
 
-Maps every test to GOAL.md §3 success criteria. All tests run on **mainnet with dust
+Maps every test to the project's success criteria. All tests run on **mainnet with dust
 amounts** (merchant-kit has no testnet). Real funds only after the recovery drill.
 
 ## Prereq: wallet + seed backup (Kon, before any funding)

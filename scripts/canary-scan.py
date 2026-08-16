@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """canary-scan.py — T5 canary: scan logs for seed-phrase fragments.
 
-GOAL.md §3.4 / test-plan T5 require a canary: grep all logs for mnemonic
+Security checklist / test-plan T5 require a canary: grep all logs for mnemonic
 fragments, so an accidental seed leak (hermes session logs, /tmp, kit dirs,
 n8n output) is caught early instead of silently. This script implements it.
 
