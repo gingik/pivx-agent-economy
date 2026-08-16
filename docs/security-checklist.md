@@ -61,5 +61,5 @@
 - [ ] Healthcheck on merchant container (`/healthz`); restart policy set.
 - [ ] Disk headroom: 97% full — clean Docker build cache before merchant build
       (`docker builder prune`), watch `df` during cargo build.
-- [ ] Failure matrix documented in DEVELOPER.md §8 (unpaid work, double-payment,
-      sync stuck, node unreachable, daemon down).
+- [ ] Failure modes reviewed: unpaid work, double-payment, sync stuck, node
+      unreachable, daemon down.

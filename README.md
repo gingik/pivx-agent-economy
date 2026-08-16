@@ -89,7 +89,6 @@ scripts/        merchant-webhook-receiver.py, merchant-dashboard.py,
                 task-runner.sh, enforce-limits.sh, ledger.py, pivutil.py,
                 canary-scan.py, daily-digest.py, mcp-bridge.py, tests
 docs/           test-plan.md, security-checklist.md
-DEVELOPER.md    master build instructions (spec, verified facts, pitfalls)
 GOAL.md         goal definition & success criteria
 ```
 
@@ -196,7 +195,6 @@ on-chain (txid `bb8bfeaa3ee231ec52a233fafb49b3c9b57f40334474303cd5d4f577da06bc67
 ## Docs
 
 - [GOAL.md](GOAL.md) — problem, success criteria, milestones
-- [DEVELOPER.md](DEVELOPER.md) — master build instructions with verified facts
 - [docs/test-plan.md](docs/test-plan.md) — test plan incl. recovery drill
 - [docs/security-checklist.md](docs/security-checklist.md) — security checklist
 

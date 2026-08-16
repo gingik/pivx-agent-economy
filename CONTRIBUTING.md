@@ -46,7 +46,7 @@ git -C vendor/pivx-merchant-kit apply ../patches/0003-mempool-height-backfill.pa
 ```
 
 4. When you bump the upstream pin, re-verify each patch still applies and
-   update DEVELOPER.md's verified-facts table.
+   note the result in the PR description.
 5. If an upstream release fixes a patched bug, mark the patch
    `SUPERSEDED` in its header and note the upstream version.
 
@@ -55,8 +55,7 @@ git -C vendor/pivx-merchant-kit apply ../patches/0003-mempool-height-backfill.pa
 - stdlib-only where possible (the webhook receiver has zero dependencies by
   design — keep it that way).
 - Ship a test alongside: `test_<name>.py` with the same name as the script.
-- Update `docs/test-plan.md` when behaviour changes; update `DEVELOPER.md`
-  verified-facts table when a claim is re-verified.
+- Update `docs/test-plan.md` when behaviour changes.
 - Log to stderr for progress, stdout for JSON (mirrors the kit's behaviour).
 
 ## PR checklist
@@ -67,10 +66,9 @@ git -C vendor/pivx-merchant-kit apply ../patches/0003-mempool-height-backfill.pa
 - [ ] Commands in docs written in full, copy-pasteable
 - [ ] No secrets, no PII; `[REDACTED]` convention respected
 - [ ] Vendor patches: header documents root cause + symptom
-- [ ] DEVELOPER.md verified-facts table updated if you changed claims
 
 ## Reporting issues
 
 Include: what you ran (full command), the exact output, and the section of
-DEVELOPER.md or the test plan that's wrong. Screenshots are welcome; redact
+the test plan or README that's wrong. Screenshots are welcome; redact
 anything that looks like a key or address you don't want public.
