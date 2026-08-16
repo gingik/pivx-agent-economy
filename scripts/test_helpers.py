@@ -166,6 +166,18 @@ def main():
     r = run_py([os.path.join(HERE, "work-dispatcher.py"), "--check", dl, "--matrix", matrix])
     check("--check OK enabled template (rc 0)", r.returncode == 0, f"rc={r.returncode} {r.stdout}")
 
+    # Category axis (fix): a task categorized 'social' (disabled template) must
+    # be skipped even when keywords would route to the enabled 'download'
+    # template — no keyword-order luck.
+    catg = os.path.join(td, "catg.json")
+    with open(catg, "w") as fh:
+        json.dump({"id": 3, "title": "Descarga Edge Wallet",
+                   "description": "Descarga Edge Wallet desde este link y crea tu wallet",
+                   "category": "social"}, fh)
+    r = run_py([os.path.join(HERE, "work-dispatcher.py"), "--check", catg, "--matrix", matrix])
+    check("--check category axis: social-category task SKIPPED (rc 3)",
+          r.returncode == 3 and "category 'social'" in r.stdout, f"rc={r.returncode} {r.stdout}")
+
     # ---- produce-proof (no wallet: --no-sign) ----
     dlf = os.path.join(td, "note.txt")
     with open(dlf, "w") as fh:

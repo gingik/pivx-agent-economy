@@ -74,8 +74,17 @@ def check_task(task: dict, matrix: dict):
     for pat in matrix.get("skip_globally", {}).get("patterns", []):
         if re.search(re.escape(pat), text):
             return False, None, f"global skip pattern: {pat}"
+    # Category axis (fix): if the board classifies this task under a template
+    # that is disabled, skip it outright — regardless of keyword hits. A task
+    # categorized 'social' must not slip through to the enabled 'download'
+    # template just because its text mentions edge/wallet/app. route() stays
+    # keyword-first (pure function, unit-tested); the category gate lives here.
+    cat = str(task.get("category") or "").lower().strip()
+    templates = matrix.get("templates", {})
+    if cat in templates and not templates[cat].get("enabled", False):
+        return False, cat, f"category '{cat}' template disabled in capability matrix"
     tmpl = route(task, matrix)
-    tpl = matrix.get("templates", {}).get(tmpl, {})
+    tpl = templates.get(tmpl, {})
     if not tpl.get("enabled", False):
         return False, tmpl, f"template '{tmpl}' disabled in capability matrix"
     return True, tmpl, "ok"

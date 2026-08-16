@@ -164,11 +164,14 @@ while IFS="$SEP" read -r TID TITLE AMOUNT; do
         continue
     fi
 
-    # 7. Submit with proof attached (item 3): container paths per pivx-agent-kit
-    #    convention (/data/pivx-agent-kit/...). Body references the attachment.
-    D_PATH="/data/pivx-agent-kit/deliverables/deliverable-$TID.txt"
-    P_PATH="/data/pivx-agent-kit/proofs/proof-$TID.json"
-    BODY="Work submitted by $AGENT for task $TID: $TITLE. Attached: deliverables/deliverable-$TID.txt (sha256 + signed proof in proofs/proof-$TID.json)."
+    # 7. Submit with proof attached (item 3): attach the ACTUAL files the
+    #    dispatcher produced (DELIVERABLE/PROOF are host paths under
+    #    $AGENT_DIR) mapped to container paths per pivx-agent-kit convention
+    #    (host $AGENT_DIR ↔ container /data/pivx-agent-kit). No hardcoded
+    #    names/extensions — the deliverable may be a .txt, .jpg, etc.
+    D_PATH="/data/pivx-agent-kit/${DELIVERABLE#"$AGENT_DIR"/}"
+    P_PATH="/data/pivx-agent-kit/${PROOF#"$AGENT_DIR"/}"
+    BODY="Work submitted by $AGENT for task $TID: $TITLE. Attached: ${D_PATH#/data/pivx-agent-kit/} (sha256 + signed proof in ${P_PATH#/data/pivx-agent-kit/})."
     submit_out="/tmp/kit_$$_submit_${TID}.out"
     if timeout 120 env PIVX_AGENT="$AGENT" pivx-agent-kit task submit "$TID" "$BODY" "$D_PATH" "$P_PATH" > "$submit_out" 2>&1; then
         journal "$TID" "submitted" ""
