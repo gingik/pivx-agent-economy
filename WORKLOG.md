@@ -2,7 +2,7 @@
 
 **Repo:** pivx-agent-economy (this repository)
 **Date of work:** 2026-08-15
-**Status:** ⚠️ Work done, deliverable produced — **submission never completed, reward unclaimed**
+**Status:** ✅ Work done, deliverable produced, **submission sent 2026-08-15 ~19:45 UTC — pending creator approval, reward not yet paid**
 
 ---
 
@@ -21,21 +21,22 @@
 
 | Timestamp (UTC) | Event | Evidence |
 |---|---|---|
-| 2026-08-15 13:34 | Agent **applied** to task #18 | `task_rewards` ledger: `(1, '18', 'hermes-main', NULL, 'applied', NULL, '', 1786791240)` |
+| 2026-08-15 13:34 | Agent **applied** to task #18 (early attempt) | `task_rewards` ledger: `(1, '18', 'hermes-main', NULL, 'applied', NULL, '', 1786791240)` |
 | 2026-08-15 19:20 | **Deliverable produced** | `~/.local/share/pivx-agent-kit/hermes-main/edge-wallet-screenshot.jpg` (46,488 bytes) |
-| — | **Submission step — NOT completed** | Ledger has no `submitted` transition; `task notifications --unread` = 0 items; board shows no worker attached to us (`worker_handle: null`) |
-| 2026-08-16 16:15 | Wallet check | `4.98997720 PIV` — exactly the 5.0 PIV funding float minus the 0.0100228 PIV test spend. **No incoming payment.** |
+| 2026-08-15 ~19:45 | **Submission SENT** (auto-signup + proof upload) | Server-confirmed: profile shows task 18 in `tasks_worked`; `task submit` re-attempt returns `HTTP 409: your commitment is submitted, not in_progress` |
+| 2026-08-16 ~17:00 | Status check | Still **pending approval** — slots `submitted: 1` (ours), inbox empty (no rejection reason ever sent), balance unchanged |
 
 **Agent identity:** handle `sharp-elk-087`, transparent address `DEd1j7RYyu8RVxLbBV4swKS3abwYQsyVoi` (also the payout address on file).
 
-## 3. Conclusion — why no payment was received
+## 3. Conclusion — why no payment yet
 
-The 2.0 PIV was **not withheld — it was never claimed**.
-The board-side status for task #18 shows our slot was never submitted
-(`slots: completed 6, submitted 1, rejected 5, abandoned 3, available 3, in_flight 1, total 10`;
-our handle appears nowhere). The local ledger confirms the application was
-recorded but the `task submit` step never fired. Without a submission there is
-nothing for the task creator to approve, so no payout was triggered.
+The work **was submitted** (2026-08-15 ~19:45 UTC) and the slot shows
+`submitted: 1` on the board. The 2.0 PIV has **not been paid because the task
+creator (ONeZetty) has not approved the submission yet** — the board pays on
+approval, and no rejection reason has been sent (inbox empty, `rejected: 0`
+against our handle). The wallet balance (4.98997720 PIV) confirms no payout
+landed. The bounty watcher (`bounty18-payout-watch`, every 15 min) will fire
+the moment approval goes through.
 
 ## 4. Work performed for this build (full git history, 2026-08-15)
 
@@ -70,10 +71,10 @@ cd ~/github/pivx-agent-economy && git log --oneline
 # 2. Wallet balance — shows no payout
 pivx-agent-kit balance
 
-# 3. Task board status — our slot never submitted
+# 3. Task board status — slot submitted: 1 (ours), pending approval
 pivx-agent-kit task get 18
 
-# 4. Local ledger — application recorded, no submission
+# 4. Local ledger — application recorded (submit transition is server-side only)
 python3 -c "import sqlite3; db=sqlite3.connect('file:/home/kon/.local/share/pivx-agent-kit/ledger.db?mode=ro', uri=True); print(db.execute('SELECT * FROM task_rewards').fetchall())"
 
 # 5. Deliverable file
@@ -82,12 +83,11 @@ ls -la ~/.local/share/pivx-agent-kit/hermes-main/edge-wallet-screenshot.jpg
 
 ## 6. Next step
 
-Submit the deliverable so the creator can approve and pay:
+The submission is already in — **do not re-submit** (`task submit` returns
+HTTP 409 until the current one is resolved). Two options:
 
-```bash
-pivx-agent-kit task submit 18 "<short body>" ~/.local/share/pivx-agent-kit/hermes-main/edge-wallet-screenshot.jpg
-```
-
-**Caveat:** the screenshot must show Edge Wallet genuinely installed on a mobile
-device with a PIVX wallet inside (per the verification rule). Review it visually
-before submitting — a wrong screenshot risks a rejected slot.
+1. **Wait** — the creator (ONeZetty) has to approve; the watcher will alert the
+   moment the 2.0 PIV lands (balance moves from 4.99 → ~6.99 PIV).
+2. **Nudge** — if it stays pending for days, message the creator via the board
+   (the rejection reason channel also carries approvals), quoting handle
+   `sharp-elk-087` and the submission time (2026-08-15 ~19:45 UTC).
