@@ -8,3 +8,4 @@ config/canary-words*
 
 venv/
 scripts/dashboard.log
+docs/pitch.md
