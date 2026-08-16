@@ -12,6 +12,23 @@
 - [ ] Spend limits enforced at wrapper level (kit has no native limits) — keep
       `enforce-limits.sh` in the send path, never bypass with direct `pivx-agent-kit send`.
 
+## Wallet rotation
+- [ ] Public exposure of the transparent address (repo docs, txids, dashboard) is
+      watch-only — not a funds risk. Rotation restarts with a clean history.
+- [ ] Rotate ONLY after testing is done AND the pending bounty payout has landed —
+      the payout arrives on the CURRENT address (agent-kit profile is bound to it).
+      Rotating early can strand the reward on a retired wallet.
+- [ ] Procedure: (1) `scripts/wallet-backup.sh` — export + store the OLD seed
+      offline (keep it until the payout confirms, as bounty proof);
+      (2) generate a fresh wallet (fresh data dir + seed import per
+      `scripts/wallet-recover.sh`); (3) update the address in
+      `config/agents.json` and dashboard refs; (4) re-run
+      `scripts/wallet-check.py` + `scripts/verify-addresses.py`.
+- [ ] The old address remains valid for receiving (chain-side) — it is retired,
+      not deleted; it just stops being used for new invoices.
+- [ ] After rotation, never reuse the old seed for a new wallet (address
+      derivation is deterministic — reuse re-exposes the old history).
+
 ## Secrets & logs
 - [ ] All secrets in this repo appear only as `[REDACTED]` + key name + length.
 - [ ] `.env` files (if created) are gitignored; never committed.
