@@ -10,6 +10,17 @@
       "birthday_height": 5236346,
       "funded": false,
       "notes": "PAPER-SEED BACKUP PENDING — do not fund until Kon confirms export backup"
+    },
+    {
+      "name": "hermes-mbp43",
+      "role": "second agent (A2A peer mbp43, Omarchy box)",
+      "data_dir": "/home/kon/.local/share/pivx-agent-kit/hermes-mbp43",
+      "host": "192.168.0.43",
+      "shield_address": "ps1437ds8ds4s0tnzq6f9glu8w6mvuxusktejggtuas2ccr86rdampp3d748vmg853p7r8r60qlmx7",
+      "transparent_address": "DUHbZqSpBD2tL5689zEFHGnQ8Ju6JrZxWi",
+      "birthday_height": 5236346,
+      "funded": false,
+      "notes": "PAPER-SEED BACKUP PENDING — do not fund until Kon confirms export backup"
     }
   ]
 }
