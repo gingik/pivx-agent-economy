@@ -8,8 +8,8 @@
       "shield_address": "ps1hpamhcrgumpt2lq6hh60y4522d986n44ktgd5jxqzge5ll8kdxfm53ne8he0c7cpajvk7gfstjq",
       "transparent_address": "DEd1j7RYyu8RVxLbBV4swKS3abwYQsyVoi",
       "birthday_height": 5236346,
-      "funded": false,
-      "notes": "PAPER-SEED BACKUP PENDING — do not fund until Kon confirms export backup"
+      "funded": true,
+      "notes": "Funded 5 PIV 2026-08-15, paper backup confirmed; float now 4.98 PIV (verified 2026-08-31)"
     },
     {
       "name": "hermes-mbp43",
@@ -19,8 +19,8 @@
       "shield_address": "ps1437ds8ds4s0tnzq6f9glu8w6mvuxusktejggtuas2ccr86rdampp3d748vmg853p7r8r60qlmx7",
       "transparent_address": "DUHbZqSpBD2tL5689zEFHGnQ8Ju6JrZxWi",
       "birthday_height": 5236346,
-      "funded": false,
-      "notes": "PAPER-SEED BACKUP PENDING — do not fund until Kon confirms export backup"
+      "funded": true,
+      "notes": "Funded 2.5 PIV 2026-08-31 from hermes-main float (txid b88e4856); paper seed backup confirmed 2026-08-31"
     }
   ]
 }

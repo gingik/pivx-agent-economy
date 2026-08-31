@@ -41,9 +41,9 @@ mkdir -p "$AGENT_DIR/deliverables" "$AGENT_DIR/proofs"
 # must NOT open the gate (bug list #6).
 SIGNUPS_DONE=$(python3 "$SCRIPT_DIR/ledger.py" count-signed-up "$LEDGER_DB" "$AGENT")
 
-tg() { # tg <text>
-    [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ] && \
-        curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+tg() { # tg <text> — no-op cleanly when creds unset (else set -e kills the loop)
+    [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ] || return 0
+    curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
         -d chat_id="$TELEGRAM_CHAT_ID" -d text="$1" >/dev/null
 }
 
